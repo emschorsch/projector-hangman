@@ -346,8 +346,11 @@ i = 100 #the x-pos on the screen
 j = 100
 t = 2
 
+def clearText(img):
+    img[j-40:j+100, 50:600] = (0,0,0)
+
 def updateGuesses(letters, guesses, img):
-    img[j-40:j+100, :] = (0,0,0)
+    clearText(img)
     cv2.putText(img, "unused letters: "+' '.join(letters), (i, j), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.85,
                 (255,255,255), t, cv2.CV_AA)
@@ -363,10 +366,13 @@ player1Color = (255,200,0)
 player2Color = (0,255,0)
 
 letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-guesses = []
+guesses = ['Q']
 
 #Initialize the images for all the different message boards
 clearBoard = board.copy()
+cv2.putText(clearBoard, "Guess a letter", (i, j-80), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                player1Color, t, cv2.CV_AA)
 updateGuesses(letters, guesses, clearBoard)
 
 cv2.imshow(winName, clearBoard)
@@ -383,16 +389,15 @@ for letter in letters:
     # opencv use x,y and numpy uses y,x
     #clearBoard[j+60:j+110, :] = (0,0,0)
     """
-    
 
 
-clearBoardPlayer1 = board.copy()
-cv2.putText(clearBoardPlayer1, "player1 make a move", (i, j), 
+clearBoardGuessMade = board.copy()
+cv2.putText(clearBoardGuessMade, "You guessed: ", (i, j), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                player1Color, t, cv2.CV_AA)
+                player2Color, t, cv2.CV_AA)
 
-clearBoardIllegalMove = board.copy()
-cv2.putText(clearBoardIllegalMove, "Illegal move, erase and try again", (i, j),
+clearBoardUnknownLetter = board.copy()
+cv2.putText(clearBoardUnknownLetter, "Unknown letter, erase and try again", (i, j),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 (0,0,255), t, cv2.CV_AA)
 
@@ -402,7 +407,7 @@ cv2.putText(obstructedBoard, "obstructed", (i, j),
                 (0,0,255), t, cv2.CV_AA)
 
 
-cv2.imshow(winName, clearBoardPlayer1)
+cv2.imshow(winName, clearBoard)
 cv2.waitKey(2000)
 
 for i in range(10):
@@ -431,7 +436,7 @@ base += squareSize #for the x dimension
 col1 += squareSize
 
 
-cv2.imshow(winName, clearBoardPlayer1)
+cv2.imshow(winName, clearBoard)
 cv2.waitKey(1000)
 
 gameplaying = True
@@ -460,11 +465,13 @@ while gameplaying:
     # erode any human made marks to detect obstructions
     cv2.erode(mask_roi, kernel, eroded_mask)
 
+    display_mask = cv2.cvtColor(mask_roi, cv.CV_GRAY2RGB);
+
     # Board is obstructed so display obstruction message
     if np.sum(eroded_mask) > 25000:
         # copies the region of interest into the board for display
         obstructedBoard[board_view_mask] = roi[:,:]
-        obstructedBoard[threshold_mask] = eroded_mask[:,:]
+        obstructedBoard[threshold_mask] = display_mask[:,:]
         cv2.imshow(winName, obstructedBoard)
 
     elif np.sum(mask_roi) > 15000:
@@ -495,38 +502,18 @@ while gameplaying:
 
         # Found definite X
         if (x_max > x_ub) and (o_max < o_lb):
-            if player1 == "":
-                player1 = 'X'
-                player1Turn = False
-                gameBoard[cellLocation(x_loc[0], x_loc[1])] = 'X'
-                #Update temporal average matrix
-                temporal_avg = frame[:] 
-            elif checkLegalMark(player1, player1Turn, 'X'):
-                player1Turn = not player1Turn #other player's turn now
-                gameBoard[cellLocation(x_loc[0], x_loc[1])] = 'X'
-                #Update temporal average matrix
-                temporal_avg = frame[:]
-            else: #Illegal move was made
-                legalMove = False
-                            
+            guess = 'X'
+            legalMove = True
+            
             cv2.circle(roi, x_loc, 5, (255,0,0))
             print x_max, o_max
+                            
+            
         # Found definite O    
         elif (x_max < x_lb) and (o_max > o_ub):
-            if player1 == "":
-                player1 = 'O'
-                player1Turn = False
-                gameBoard[cellLocation(o_loc[0], o_loc[1])] = 'O'
-                #Update temporal average matrix
-                temporal_avg = frame[:]
-            elif checkLegalMark(player1, player1Turn, 'O'):
-                player1Turn = not player1Turn #other player's turn now
-                gameBoard[cellLocation(o_loc[0], o_loc[1])] = 'O'
-                #Update temporal average matrix
-                temporal_avg = frame[:]
-            else: #Illegal move was made
-                legalMove = False
-
+            guess = 'O'
+            legalMove = True
+            
             cv2.circle(roi, o_loc, 5, (0,255,0))
             print x_max, o_max
         else:
@@ -536,58 +523,32 @@ while gameplaying:
             # display red circle indicating no mark but where best matching o is
             cv2.circle(roi, o_loc, 5, (0,0,255))
 
-        # Check if the game has been won and get the winning moves if so
-        winningMoves = isGameWon(gameBoard)
-        if winningMoves:
-            if not player1Turn: #Player 1 just played winning move
-                clearBoardPlayer1Win[board_view_mask] = roi[:,:]
-                clearBoardPlayer1Win[threshold_mask] = eroded_mask[:,:]
-                colorCells(clearBoardPlayer1Win, winningMoves, base, col1)
-                cv2.imshow(winName, clearBoardPlayer1Win)
-            else:
-                clearBoardPlayer2Win[board_view_mask] = roi[:,:]
-                clearBoardPlayer2Win[threshold_mask] = eroded_mask[:,:]
-                colorCells(clearBoardPlayer2Win, winningMoves, base, col1, player1=False)
-                cv2.imshow(winName, clearBoardPlayer2Win)
-            cv2.waitKey()
-            gameplaying = False
-            break
-
-        
-        if len(gameBoard) == 9: #board is filled so game is a tie
-            clearBoardCatsCradle[board_view_mask] = roi[:,:]
-            clearBoardCatsCradle[threshold_mask] = eroded_mask[:,:]
-            cv2.imshow(winName, clearBoardCatsCradle)
-            cv2.waitKey()
-            gameplaying = False
-            break
-
-
         #Now display the proper message
         if not legalMove:
-            clearBoardIllegalMove[board_view_mask] = roi[:,:]
-            clearBoardIllegalMove[threshold_mask] = eroded_mask[:,:]
-            cv2.imshow(winName, clearBoardIllegalMove)
-        elif player1Turn:
-            clearBoardPlayer1[board_view_mask] = roi[:,:]
-            clearBoardPlayer1[threshold_mask] = eroded_mask[:,:]
-            cv2.imshow(winName, clearBoardPlayer1)
+            clearBoardUnknownLetter[board_view_mask] = roi[:,:]
+            clearBoardUnknownLetter[threshold_mask] = display_mask[:,:]
+            cv2.imshow(winName, clearBoardUnknownLetter)
         else:
-            clearBoardPlayer2[board_view_mask] = roi[:,:]
-            clearBoardPlayer2[threshold_mask] = eroded_mask[:,:]
-            cv2.imshow(winName, clearBoardPlayer2)
+            clearBoardGuessMade[board_view_mask] = roi[:,:]
+            clearBoardGuessMade[threshold_mask] = display_mask[:,:]
+
+            guesses[0] = guess
+            #letters.remove(guess)
+            #clearText(clearBoardGuessMade)
+            """
+            cv2.putText(clearBoardGuessMade, "You guessed: "+guess, (i, j), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                player2Color, t, cv2.CV_AA)
+            """
+
+            cv2.imshow(winName, clearBoardGuessMade)
 
     else: #No marks were made, display turn message
 #TODO: should we reset temporal avg if legal move was false
         legalMove = True
-        if player1Turn:
-            clearBoardPlayer1[board_view_mask] = roi[:,:]
-            clearBoardPlayer1[threshold_mask] = eroded_mask[:,:]
-            cv2.imshow(winName, clearBoardPlayer1)
-        else:
-            clearBoardPlayer2[board_view_mask] = roi[:,:]
-            clearBoardPlayer2[threshold_mask] = eroded_mask[:,:]
-            cv2.imshow(winName, clearBoardPlayer2)
+        clearBoard[board_view_mask] = roi[:,:]
+        clearBoard[threshold_mask] = display_mask[:,:]
+        cv2.imshow(winName, clearBoard)
         
     # Delay for 1ms and get a key
     k = cv2.waitKey(10)
