@@ -18,13 +18,55 @@ def getImMask(filename):
     w = image.shape[1]
     h = image.shape[0]
     mask = np.zeros((h, w), 'uint8')
-    mask_resized = np.zeros((80,80),'uint8')
     cv2.threshold(image, 170, 255, cv2.THRESH_BINARY, mask)
-    cv2.resize(mask,(80, 80), mask_resized)
-
 
     # For test letters - invert mask
-    mask_resized = np.subtract(255, mask_resized)
+    mask= np.subtract(255, mask)
+    
+
+    # Get box around letter
+    w = mask.shape[1]
+    h = mask.shape[0]
+
+
+    # Get y,x indices of "on" pixels
+    indices = np.array(np.where(mask==255))
+    x = indices[1]                 # X measured from left
+    y = indices[0]                 # Y measured from top
+
+    # Find smallest box around all "on" pixels
+    xmin = min(x)
+    ymin= min(y)
+    xmax = max(x)
+    ymax = max(y)
+
+    # Crop image around letter
+    mask = mask[ymin:ymax, xmin:xmax]
+
+    
+    # Resize image
+    mask_resized = np.zeros((80,80),'uint8')
+    cv2.resize(mask,(80, 80), mask_resized)
+
+    #cv2.imshow('window', mask)
+    #cv2.waitKey(5000)
+    
+    '''
+    if (ymax-ymin) > (xmax-xmin):
+        h_new = 80
+        w_new = (xmax-xmin)*80/(ymax-ymin)
+    else:
+        w_new = 80
+        h_new = (ymax-ymin)*80/(xmax-xmin)
+    '''
+
+
+    #mask_resized = np.zeros((80,80),'uint8')
+    #cv2.resize(mask,(80, 80), mask_resized)
+    
+
+    #cv2.imshow('window', mask_resized)
+    #cv2.waitKey()
     return mask_resized
     
 
@@ -48,6 +90,8 @@ def getFeatures(mask):
     a2 = y_center   # Vertical position of box center (measured from bottom)
     a3 = xmax-xmin  # Width of box
     a4 = ymax-ymin  # Height of box
+
+    
 
     # Display rectangle around letter
     frame = mask.copy()
@@ -139,69 +183,33 @@ def getFeatures(mask):
     x_edge_pos = np.subtract(a3, edge_indices[1])
     a16 = sum(x_edge_pos)
 
-    attributes = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16]
-    #print attributes
+    attributes = [a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16]
 
 
-    # Scale attributes to integers between 0 and 15
-    # Newvalue = (((OldValue-OldMin) * NewRange) / OldRange) + NewMin
-    oldmin1 = 1
-    oldmax1 = 80
-    oldrange1 = oldmax1 - oldmin1
+    mins = [1157, -.2284, -.1922, .0334, .0483, -.0355, -.0214,-.017,0, 0, .2152, 659]
+    maxes = [5745, .1870, .2109, .1376, .1437, .0629, .0210, .0167, 2.7468, 9047, 2.2278, 7113]
 
-    # Scale attributes with range 0:80 (for 80x80 pixel image)
-    a1 = int(a1*15/80)
-    a2 = int(a2*15/80)
-    a3 = int(a3*15/80)
-    a4 = int(a4*15/80)
-
-    # Scale attribute with range 0:6400
-    a5 = int(a5*15/6400)
-
-    # Scale attributes with range -1:1
-    a6 = int(((a6+1)*15)/2)
-    a7 = int(((a7+1)*15)/2)
-    a8 = int(((a8+1)*15)/2)
-    a9 = int(((a9+1)*15)/2)
-    a10 = int(((a10+1)*15)/2)
-    a11 = int(((a11+1)*15)/2)
-    a12 = int(((a12+1)*15)/2)
-
-    # Scale attributes with range 0:40
-    a13 = int(a13*15/40)
-    a15 = int(a15*15/40)
-
-    # Scale attributes with range 0:1600
-    a14 = int(a14*15/3600)
-    a16 = int(a16*15/3600)
-
-
-
-    attributes = [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16]
-    print attributes
+    for i in range(len(attributes)):
+        attribute = (attributes[i]-mins[i])*15/(maxes[i]-mins[i])
+        attributes[i] = attribute
+       
     return attributes
 
 def main():
     alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
-    A_filenames = glob.glob("letters/A/*")
-    #filename = "test_l.png"
-    #mask = getImMask(filename)
-    #features = getFeatures(mask)
-    #print features
+
 
     f = open('testdata.data', 'w')
     
-
+    
     for letter in alphabet:
         filenames = glob.glob("letters/" + letter + '/*')
         for filename in filenames:
             mask = getImMask(filename)
             features = getFeatures(mask)
-            #print features
             f.write(letter + ',' + ','.join(map(str, features)) + "\n")
-
-        
-    
+            
+                    
 main()
     
 

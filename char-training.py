@@ -3,11 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Load the data, converters convert the letter to a number
-data= np.loadtxt('letter-recognition.data', dtype= 'float32', delimiter = ',',
+data= np.loadtxt('testdata.data', dtype= 'float32', delimiter = ',',
                     converters= {0: lambda ch: ord(ch)-ord('A')})
 
 # split the data to two, 10000 each for train and test
 train, test = np.vsplit(data,2)
+train = data
+test = data
 
 # split trainData and testData to features and responses
 responses, trainData = np.hsplit(train,[1])
@@ -19,5 +21,5 @@ knn.train(trainData, responses)
 ret, result, neighbours, dist = knn.find_nearest(testData, k=5)
 
 correct = np.count_nonzero(result == labels)
-accuracy = correct*100.0/10000
+accuracy = correct*100.0/len(test)
 print accuracy
