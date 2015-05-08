@@ -229,11 +229,11 @@ if not ok or frame is None:
 w = frame.shape[1]
 h = frame.shape[0]
 
+squareSize = 80
 base = 250 #for the x dimension
 col1 = 250
 
 #Initialize the board image
-squareSize = 80
 board = np.zeros((h, w, 3), dtype = np.uint8)
 cv2.line(board, (base+squareSize, col1), (base+squareSize, col1+3*squareSize), (255,255,255), 10)
 cv2.line(board, (base+2*squareSize, col1), (base+2*squareSize, col1+3*squareSize), (255,255,255), 10)
@@ -342,43 +342,54 @@ M = np.eye(3,3, dtype='float32')
 M2 = np.matrix(M) * homo[0]
 
 # parameters for the text displays
-i = 160
-j = 160
-t = 3
+i = 100 #the x-pos on the screen
+j = 100
+t = 2
+
+def updateGuesses(letters, guesses, img):
+    img[j-40:j+100, :] = (0,0,0)
+    cv2.putText(img, "unused letters: "+' '.join(letters), (i, j), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.85,
+                (255,255,255), t, cv2.CV_AA)
+
+    cv2.putText(img, "guessed letters: "+' '.join(guesses), (i, j+50), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.85,
+                (255,255,255), t, cv2.CV_AA)
+
+    return
+
 
 player1Color = (255,200,0)
 player2Color = (0,255,0)
 
+letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+guesses = []
+
 #Initialize the images for all the different message boards
 clearBoard = board.copy()
-cv2.putText(clearBoard, "clear", (i, j), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                (255,255,255), t, cv2.CV_AA)
+updateGuesses(letters, guesses, clearBoard)
+
+cv2.imshow(winName, clearBoard)
+cv2.waitKey(1000)
+
+"""
+for letter in letters:
+    guesses.append(letter)
+    del letters[0]
+    updateGuesses(letters, guesses, clearBoard)
+
+    cv2.imshow(winName, clearBoard)
+    cv2.waitKey(2000)
+    # opencv use x,y and numpy uses y,x
+    #clearBoard[j+60:j+110, :] = (0,0,0)
+    """
+    
+
 
 clearBoardPlayer1 = board.copy()
 cv2.putText(clearBoardPlayer1, "player1 make a move", (i, j), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 player1Color, t, cv2.CV_AA)
-
-clearBoardPlayer1Win = board.copy()
-cv2.putText(clearBoardPlayer1Win, "player1 won", (i, j), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                player1Color, t, cv2.CV_AA)
-
-clearBoardPlayer2 = board.copy()
-cv2.putText(clearBoardPlayer2, "player2 make a move", (i, j), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                player2Color, t, cv2.CV_AA)
-
-clearBoardPlayer2Win = board.copy()
-cv2.putText(clearBoardPlayer2Win, "player2 won", (i, j), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                player2Color, t, cv2.CV_AA)
-
-clearBoardCatsCradle = board.copy()
-cv2.putText(clearBoardCatsCradle, "cats cradle", (i, j), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                (0,0,255), t, cv2.CV_AA)
 
 clearBoardIllegalMove = board.copy()
 cv2.putText(clearBoardIllegalMove, "Illegal move, erase and try again", (i, j),
@@ -408,6 +419,17 @@ x_lb = .77
 o_ub = .49
 o_lb = .59
 
+# To display the image of the board that the webcam sees
+board_view_mask = (slice(col1, col1+squareSize), 
+                    slice(base+4*squareSize,base+5*squareSize))
+
+# To display the thresholded image of the board
+threshold_mask = (slice(col1, col1+squareSize), 
+                    slice(base+6*squareSize,base+7*squareSize))
+
+base += squareSize #for the x dimension
+col1 += squareSize
+
 
 cv2.imshow(winName, clearBoardPlayer1)
 cv2.waitKey(1000)
@@ -427,11 +449,11 @@ while gameplaying:
     dst = cv2.warpPerspective(frame, M2, (w, h))
 
     # The actual game board
-    roi = dst[col1:col1+3*squareSize, base:base+3*squareSize]
+    roi = dst[col1:col1+squareSize, base:base+squareSize]
 
     mask = subtractBackground(frame, temporal_avg, threshold=60)
     warped_mask = cv2.warpPerspective(mask, M2, (w, h))
-    mask_roi = warped_mask[col1:col1+3*squareSize, base:base+3*squareSize]
+    mask_roi = warped_mask[col1:col1+squareSize, base:base+squareSize]
 
     eroded_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
     kernel = np.ones((4,4),np.uint8)
@@ -441,7 +463,8 @@ while gameplaying:
     # Board is obstructed so display obstruction message
     if np.sum(eroded_mask) > 25000:
         # copies the region of interest into the board for display
-        obstructedBoard[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+        obstructedBoard[board_view_mask] = roi[:,:]
+        obstructedBoard[threshold_mask] = eroded_mask[:,:]
         cv2.imshow(winName, obstructedBoard)
 
     elif np.sum(mask_roi) > 15000:
@@ -517,11 +540,13 @@ while gameplaying:
         winningMoves = isGameWon(gameBoard)
         if winningMoves:
             if not player1Turn: #Player 1 just played winning move
-                clearBoardPlayer1Win[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+                clearBoardPlayer1Win[board_view_mask] = roi[:,:]
+                clearBoardPlayer1Win[threshold_mask] = eroded_mask[:,:]
                 colorCells(clearBoardPlayer1Win, winningMoves, base, col1)
                 cv2.imshow(winName, clearBoardPlayer1Win)
             else:
-                clearBoardPlayer2Win[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+                clearBoardPlayer2Win[board_view_mask] = roi[:,:]
+                clearBoardPlayer2Win[threshold_mask] = eroded_mask[:,:]
                 colorCells(clearBoardPlayer2Win, winningMoves, base, col1, player1=False)
                 cv2.imshow(winName, clearBoardPlayer2Win)
             cv2.waitKey()
@@ -530,7 +555,8 @@ while gameplaying:
 
         
         if len(gameBoard) == 9: #board is filled so game is a tie
-            clearBoardCatsCradle[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+            clearBoardCatsCradle[board_view_mask] = roi[:,:]
+            clearBoardCatsCradle[threshold_mask] = eroded_mask[:,:]
             cv2.imshow(winName, clearBoardCatsCradle)
             cv2.waitKey()
             gameplaying = False
@@ -539,21 +565,28 @@ while gameplaying:
 
         #Now display the proper message
         if not legalMove:
-            clearBoardIllegalMove[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+            clearBoardIllegalMove[board_view_mask] = roi[:,:]
+            clearBoardIllegalMove[threshold_mask] = eroded_mask[:,:]
             cv2.imshow(winName, clearBoardIllegalMove)
         elif player1Turn:
-            clearBoardPlayer1[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+            clearBoardPlayer1[board_view_mask] = roi[:,:]
+            clearBoardPlayer1[threshold_mask] = eroded_mask[:,:]
             cv2.imshow(winName, clearBoardPlayer1)
         else:
-            clearBoardPlayer2[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+            clearBoardPlayer2[board_view_mask] = roi[:,:]
+            clearBoardPlayer2[threshold_mask] = eroded_mask[:,:]
             cv2.imshow(winName, clearBoardPlayer2)
 
     else: #No marks were made, display turn message
+#TODO: should we reset temporal avg if legal move was false
+        legalMove = True
         if player1Turn:
-            clearBoardPlayer1[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+            clearBoardPlayer1[board_view_mask] = roi[:,:]
+            clearBoardPlayer1[threshold_mask] = eroded_mask[:,:]
             cv2.imshow(winName, clearBoardPlayer1)
         else:
-            clearBoardPlayer2[col1:col1+3*squareSize, base+4*squareSize:base+7*squareSize] = roi[:,:]
+            clearBoardPlayer2[board_view_mask] = roi[:,:]
+            clearBoardPlayer2[threshold_mask] = eroded_mask[:,:]
             cv2.imshow(winName, clearBoardPlayer2)
         
     # Delay for 1ms and get a key
@@ -562,3 +595,4 @@ while gameplaying:
     # Check for ESC hit:
     if k % 0x100 == 27:
         break
+
