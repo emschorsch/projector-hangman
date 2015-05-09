@@ -18,6 +18,7 @@ labels, testData = np.hsplit(test,[1])
 # Initiate the kNN, classify, measure accuracy.
 knn = cv2.KNearest()
 knn.train(trainData, responses)
+import pdb; pdb.set_trace()
 ret, result, neighbours, dist = knn.find_nearest(testData, k=5)
 
 correct = np.count_nonzero(result == labels)

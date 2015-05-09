@@ -9,6 +9,7 @@ import glob
 sys.path.append('../cvk2')
 import cvk2
 
+
 def getImMask(filename):
 
     # Get letter mask
@@ -67,6 +68,7 @@ def getImMask(filename):
 
     #cv2.imshow('window', mask_resized)
     #cv2.waitKey()
+
     return mask_resized
     
 
@@ -195,6 +197,7 @@ def getFeatures(mask):
        
     return attributes
 
+
 def main():
     alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
 
@@ -209,8 +212,8 @@ def main():
             features = getFeatures(mask)
             f.write(letter + ',' + ','.join(map(str, features)) + "\n")
             
-                    
-main()
+if __name__ == '__main__':                    
+    main()
     
 
 

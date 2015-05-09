@@ -24,6 +24,9 @@ import numpy as np
 import sys
 import struct
 
+import findattributes
+import matplotlib.pyplot as plt
+
 # Tell python where to find cvk2 module before importing it.
 sys.path.append('../cvk2')
 import cvk2
@@ -85,67 +88,6 @@ def subtractBackground(frame, background, threshold=120):
     # greater than or equal to <threshold> go to 255.
     cv2.threshold(dists_uint8, threshold, 255, cv2.THRESH_BINARY, mask) 
     return mask
-
-
-"""
-inefficient
-"""
-def isGameWon(board):
-    for piece in ['X', 'O']:
-        for coord in board:
-            moves = isMoveWinning(board, coord, piece)
-            if moves:
-                return moves
-    return False
-
-"""
-board: dictionary of board. Keys are tuple of (row,col)
-    Values are piece located at the board, empty if no piece
-"""
-def isMoveWinning(board, coord, piece):
-    if checkRow(board, coord[0], piece):
-        return [(coord[0], 0), (coord[0], 1), (coord[0], 2)]
-    elif checkCol(board, coord[1], piece):
-        return [(0, coord[1]), (1, coord[1]), (2, coord[1])]
-    elif coord[0] == coord[1] and checkDiag(board, piece, True):
-        return [(0,0), (1,1), (2,2)]
-    elif (2 - coord[0]) == coord[1] and checkDiag(board, piece, False):
-        return [(2,0), (1,1), (0,2)]
-    return False
-
-
-"""
-Checks row to see if piece has won
-"""
-def checkRow(board, row, piece):
-    for i in range(3):
-        if board.get((row, i), None) != piece:
-            return False
-    return True
-
-"""
-Checks col to see if piece has won
-"""
-def checkCol(board, col, piece):
-    for i in range(3):
-        if board.get((i, col), None) != piece:
-            return False
-    return True
-
-"""
-Checks diagonal to see if piece has won
-"""
-def checkDiag(board, piece, major=True):
-    if major:
-        for i in range(3):
-            if board.get((i, i), None) != piece:
-                return False
-        return True
-    else:
-        for i in range(3):
-            if board.get((2-i, i), None) != piece:
-                return False
-        return True
 
 """
 player1: The move token player1 is using
@@ -244,6 +186,29 @@ cv2.line(board, (base, col1+2*squareSize), (base+3*squareSize, col1+2*squareSize
 cv2.imshow(winName, board)
 cv2.waitKey(1000)
 
+################### TRAIN the KNN ############################
+########################################################
+
+# Load the data, converters convert the letter to a number
+data= np.loadtxt('testdata.data', dtype= 'float32', delimiter = ',',
+                    converters= {0: lambda ch: ord(ch)-ord('A')})
+
+# split the data to two, 10000 each for train and test
+train, test = np.vsplit(data,2)
+train = data
+test = data
+
+# split trainData and testData to features and responses
+responses, trainData = np.hsplit(train,[1])
+labels, testData = np.hsplit(test,[1])
+
+# Initiate the kNN, classify, measure accuracy.
+knn = cv2.KNearest()
+knn.train(trainData, responses)
+
+############################ Construct the templates #######################
+######################################################################
+
 x_templates = []
 o_templates = []
 
@@ -326,8 +291,6 @@ for center in centers:
     c2.append(np.array(cvk2.a2ti(getDot(cnt)[0]), dtype=np.float64))
 
 
-
-
 ##############
 #PART B
 #############
@@ -375,9 +338,6 @@ cv2.putText(clearBoard, "Guess a letter", (i, j-80),
                 player1Color, t, cv2.CV_AA)
 updateGuesses(letters, guesses, clearBoard)
 
-cv2.imshow(winName, clearBoard)
-cv2.waitKey(1000)
-
 """
 for letter in letters:
     guesses.append(letter)
@@ -408,7 +368,7 @@ cv2.putText(obstructedBoard, "obstructed", (i, j),
 
 
 cv2.imshow(winName, clearBoard)
-cv2.waitKey(2000)
+cv2.waitKey(500)
 
 for i in range(10):
     ok, frame = capture.read()
@@ -437,7 +397,7 @@ col1 += squareSize
 
 
 cv2.imshow(winName, clearBoard)
-cv2.waitKey(1000)
+cv2.waitKey(500)
 
 gameplaying = True
 player1Turn = True
@@ -458,7 +418,10 @@ while gameplaying:
 
     mask = subtractBackground(frame, temporal_avg, threshold=60)
     warped_mask = cv2.warpPerspective(mask, M2, (w, h))
-    mask_roi = warped_mask[col1:col1+squareSize, base:base+squareSize]
+    temp_mask_roi = warped_mask[col1:col1+squareSize, base:base+squareSize]
+    # with value less than 100 go to 0, and all pixels with value
+    # greater than or equal to 100 go to 255.
+    mask_roi = cv2.threshold(temp_mask_roi, 100, 255, cv2.THRESH_BINARY)[1]
 
     eroded_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
     kernel = np.ones((4,4),np.uint8)
@@ -479,52 +442,37 @@ while gameplaying:
         # To search for templates check all x templates and all o templates.
         #   record the best result for each. Then using hysterisis thresholding
         #   check if the mark should be classified as x, o or neither
-        x_max = -1
-        x_loc = (0,0)
-        o_max = -1
-        o_loc = (0,0)
-    
-        for x_templ in x_templates:
-            m = cv2.matchTemplate(mask_roi, x_templ, method=cv.CV_TM_CCORR_NORMED)
-            minval, maxval, minLoc, maxLoc = cv2.minMaxLoc(m)
 
-            if maxval > x_max:
-                x_max = maxval
-                x_loc = maxLoc
+        ###################### Now finding Contours ##########################
+        ######################################################################
+        ## Citation: http://stackoverflow.com/questions/9413216/simple-digit-recognition-ocr-in-opencv-python?lq=1
 
-        for o_templ in o_templates:
-            m2 = cv2.matchTemplate(mask_roi, o_templ, method=cv.CV_TM_CCORR_NORMED)
-            minval2, maxval2, minLoc2, maxLoc2 = cv2.minMaxLoc(m2)
+        contours,hierarchy = cv2.findContours(mask_roi.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
 
-            if maxval2 > o_max:
-                o_max = maxval2
-                o_loc = maxLoc2
+        max_area = 0
+        [x2, y2, w2, h2] = [0]*4
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            if area > max_area:
+                max_area = area
+                [x2,y2,w2,h2] = cv2.boundingRect(cnt)
 
-        # Found definite X
-        if (x_max > x_ub) and (o_max < o_lb):
-            guess = 'X'
-            legalMove = True
+                #roi = thresh[y:y+h,x:x+w]
+                #roismall = cv2.resize(roi,(10,10))
+                #cv2.imshow('norm',im)
+        
+        if max_area > 50:
+            cv2.rectangle(display_mask,(x2,y2),(x2+w2,y2+h2),(0,0,255),2)
             
-            cv2.circle(roi, x_loc, 5, (255,0,0))
-            print x_max, o_max
-                            
-            
-        # Found definite O    
-        elif (x_max < x_lb) and (o_max > o_ub):
-            guess = 'O'
-            legalMove = True
-            
-            cv2.circle(roi, o_loc, 5, (0,255,0))
-            print x_max, o_max
-        else:
-            legalMove = False
-            
-            #print "Couldn't decipher mark", x_max, o_max
-            # display red circle indicating no mark but where best matching o is
-            cv2.circle(roi, o_loc, 5, (0,0,255))
+        features = findattributes.getFeatures(mask_roi)
+        ret, result, neighbours, dist = knn.find_nearest(
+                        np.array([features], dtype='float32'), k=3)
+        guess = unichr(int(result[0][0]) + ord('A'))
+        print guess, "dist: ", dist, "features: ", features        
+
 
         #Now display the proper message
-        if not legalMove:
+        if np.sum(dist) > 800:
             clearBoardUnknownLetter[board_view_mask] = roi[:,:]
             clearBoardUnknownLetter[threshold_mask] = display_mask[:,:]
             cv2.imshow(winName, clearBoardUnknownLetter)
@@ -534,12 +482,12 @@ while gameplaying:
 
             guesses[0] = guess
             #letters.remove(guess)
-            #clearText(clearBoardGuessMade)
-            """
+            clearText(clearBoardGuessMade)
+           # """
             cv2.putText(clearBoardGuessMade, "You guessed: "+guess, (i, j), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 player2Color, t, cv2.CV_AA)
-            """
+           # """
 
             cv2.imshow(winName, clearBoardGuessMade)
 
