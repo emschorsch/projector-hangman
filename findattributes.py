@@ -73,6 +73,7 @@ def getImMask(filename):
     
 
 def getFeatures(mask):
+    '''
     w = mask.shape[1]
     h = mask.shape[0]
 
@@ -194,7 +195,8 @@ def getFeatures(mask):
     for i in range(len(attributes)):
         attribute = (attributes[i]-mins[i])*15/(maxes[i]-mins[i])
         attributes[i] = attribute
-       
+    '''   
+    attributes = mask.flatten()   
     return attributes
 
 

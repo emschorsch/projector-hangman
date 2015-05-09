@@ -428,6 +428,17 @@ while gameplaying:
     # erode any human made marks to detect obstructions
     cv2.erode(mask_roi, kernel, eroded_mask)
 
+    # erode noise
+    #erode_denoised_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
+    #kernel = np.ones((1,1),np.uint8)
+    #cv2.erode(mask_roi, kernel, erode_denoised_mask)
+    kernel = np.ones((4,4),np.uint8)
+    denoised_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
+    cv2.dilate(mask_roi, kernel, denoised_mask)
+
+    mask_roi = denoised_mask
+
+
     display_mask = cv2.cvtColor(mask_roi, cv.CV_GRAY2RGB);
 
     # Board is obstructed so display obstruction message
@@ -463,16 +474,22 @@ while gameplaying:
         
         if max_area > 50:
             cv2.rectangle(display_mask,(x2,y2),(x2+w2,y2+h2),(0,0,255),2)
+          
+        #Crop mask around letter
+        mask_roi = mask_roi[y2:y2+h2, x2:x2+w2]
+        mask_resized = np.zeros((80,80),'uint8')
+        cv2.resize(mask_roi,(80,80), mask_resized)
             
-        features = findattributes.getFeatures(mask_roi)
+        features = findattributes.getFeatures(mask_resized)
         ret, result, neighbours, dist = knn.find_nearest(
-                        np.array([features], dtype='float32'), k=3)
+                        np.array([features], dtype='float32'), k=5)
         guess = unichr(int(result[0][0]) + ord('A'))
-        print guess, "dist: ", dist, "features: ", features        
+        #print guess, "dist: ", dist, "features: ", features        
+        display_mask = cv2.cvtColor(mask_resized, cv.CV_GRAY2RGB);
 
 
         #Now display the proper message
-        if np.sum(dist) > 800:
+        if np.sum(dist) < -1:
             clearBoardUnknownLetter[board_view_mask] = roi[:,:]
             clearBoardUnknownLetter[threshold_mask] = display_mask[:,:]
             cv2.imshow(winName, clearBoardUnknownLetter)
