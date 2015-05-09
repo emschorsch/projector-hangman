@@ -5,6 +5,8 @@ import sys
 import struct
 import glob
 
+from random import choice, sample
+
 # Tell python where to find cvk2 module before importing it.
 sys.path.append('../cvk2')
 import cvk2
@@ -224,12 +226,14 @@ def getWord():
             word = word.strip(",./?':;()_- !&")
             word = word.lower()
         alice_list += [word]
+
+    alice_words = set(alice_list)
         
     # Choose word from Alice in wonderland    
-    word = choice(alice_list)
+    word = sample(alice_words, 1)[0]
     # Pick new word until valid 
-    while (word not in mydict) or (len(word) < 5):
-        word = choice(alice_list)
+    while (not word in mydict) or (len(word) < 5):
+        word = sample(alice_words,1)[0]
     return word
 
         

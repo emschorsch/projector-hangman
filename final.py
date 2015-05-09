@@ -8,7 +8,7 @@
 #
 ########################################################################
 #
-# This project demonstrates a computer referee for two player tic-tac-toe
+# This project demonstrates a computer referee for hangman
 # Project the computer sceen and aim the webcam at the projected image
 # so that the board is appropriately captured
 #
@@ -177,10 +177,10 @@ col1 = 250
 
 #Initialize the board image
 board = np.zeros((h, w, 3), dtype = np.uint8)
-cv2.line(board, (base+squareSize, col1), (base+squareSize, col1+3*squareSize), (255,255,255), 10)
-cv2.line(board, (base+2*squareSize, col1), (base+2*squareSize, col1+3*squareSize), (255,255,255), 10)
-cv2.line(board, (base, col1+squareSize), (base+3*squareSize, col1+squareSize), (255,255,255), 10)
-cv2.line(board, (base, col1+2*squareSize), (base+3*squareSize, col1+2*squareSize), (255,255,255), 10)
+cv2.line(board, (base+squareSize, col1+squareSize), (base+squareSize, col1+2*squareSize), (255,255,255), 10)
+cv2.line(board, (base+2*squareSize, col1+squareSize), (base+2*squareSize, col1+2*squareSize), (255,255,255), 10)
+cv2.line(board, (base+squareSize, col1+squareSize), (base+2*squareSize, col1+squareSize), (255,255,255), 10)
+cv2.line(board, (base+squareSize, col1+2*squareSize), (base+2*squareSize, col1+2*squareSize), (255,255,255), 10)
 
 
 cv2.imshow(winName, board)
@@ -206,44 +206,12 @@ labels, testData = np.hsplit(test,[1])
 knn = cv2.KNearest()
 knn.train(trainData, responses)
 
-############################ Construct the templates #######################
-######################################################################
-
-x_templates = []
-o_templates = []
-
-o_line_widths = [2, 3, 4]
-o_temp_sizes = [35, 45, 55, 65, 75]
-
-x_line_widths = [1, 2, 3, 4]
-x_temp_sizes = [15, 25]
-
-
-# Generate o_templates of dif sizes and line widths
-for width in o_line_widths:
-    for size in o_temp_sizes:
-        o = np.zeros((size,size,3), dtype = np.uint8)
-        cv2.circle(o, (size/2,size/2), (size/2)-5, (255,255,255), width)
-        #x_templ = np.empty((size, size), 'uint8')
-        #o_templ = np.empty((size, size), 'uint8')
-        o_templ = cv2.cvtColor(o, cv2.COLOR_BGR2GRAY)
-        cv2.GaussianBlur(o_templ, (1,1), 1)
-        o_templates.append(o_templ)
-
-# Generate x_templates of diff sizes and line widths
-for width in x_line_widths:
-    for size in x_temp_sizes:
-        x = np.zeros((size,size,3), dtype = np.uint8)
-        cv2.line(x, (0,0), (size,size), (255,255,255), width)
-        cv2.line(x, (0,size), (size, 0), (255,255,255), width)
-        x_templ = cv2.cvtColor(x, cv2.COLOR_BGR2GRAY)
-        cv2.GaussianBlur(x_templ, (1,1), 1)
-        x_templates.append(x_templ)
-
+############### Setup the homography
+###################################################
 
 temp = np.zeros((h, w, 3), dtype = np.uint8)
 cv2.imshow(winName, temp)
-cv2.waitKey(5000)
+cv2.waitKey(3000)
 
 for i in range(10):
     ok, frame = capture.read()
@@ -304,55 +272,74 @@ print
 M = np.eye(3,3, dtype='float32')
 M2 = np.matrix(M) * homo[0]
 
-# parameters for the text displays
-i = 100 #the x-pos on the screen
-j = 100
-t = 2
+################ Gameplay ####################
+########################################
+def clearText(img, i=100, j=100):
+    # opencv use x,y and numpy uses y,x
+    img[j-30:j+120, 50:] = (0,0,0)
 
-def clearText(img):
-    img[j-40:j+100, 50:600] = (0,0,0)
-
-def updateGuesses(letters, guesses, img):
-    clearText(img)
-    cv2.putText(img, "unused letters: "+' '.join(letters), (i, j), 
+def updateGuesses(letters, guesses, img, i=100, j=100):
+    clearText(img, i, j)
+    cv2.putText(clearBoard, "word: "+displayWord(guesses,word), (i, j-20),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.2,
+                player1Color, t, cv2.CV_AA)
+    cv2.putText(img, "unused letters: "+' '.join(letters), (i+40, j+20), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.85,
                 (255,255,255), t, cv2.CV_AA)
 
-    cv2.putText(img, "guessed letters: "+' '.join(guesses), (i, j+50), 
+    cv2.putText(img, "guessed letters: "+' '.join(guesses), (i+40, j+60), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.85,
                 (255,255,255), t, cv2.CV_AA)
 
     return
 
+def displayWord(guesses, word):
+    guessedLetters = set(guesses)
+    displayString = []
+    for char in word:
+        if char in guessedLetters:
+            displayString.append(char.upper())
+        else:
+            displayString.append('_')
+
+    return ' '.join(displayString)
+
+def guessedWord(guesses, word):
+    temp = set(guesses)
+    for char in word:
+        if char not in temp:
+            return False
+    return True
+
+word = findattributes.getWord() #"testing"
+print word
+word = word.upper()
+num_guesses = 0
+max_guesses = 15
+
 
 player1Color = (255,200,0)
 player2Color = (0,255,0)
 
+# parameters for the text displays
+i = 100 #the x-pos on the screen
+j = 100
+t = 2
+
 letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-guesses = ['Q']
+guesses = []
 
 #Initialize the images for all the different message boards
 clearBoard = board.copy()
-cv2.putText(clearBoard, "Guess a letter", (i, j-80), 
+cv2.putText(clearBoard, "Guess a letter", (i, j-60), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 player1Color, t, cv2.CV_AA)
+
 updateGuesses(letters, guesses, clearBoard)
-
-"""
-for letter in letters:
-    guesses.append(letter)
-    del letters[0]
-    updateGuesses(letters, guesses, clearBoard)
-
-    cv2.imshow(winName, clearBoard)
-    cv2.waitKey(2000)
-    # opencv use x,y and numpy uses y,x
-    #clearBoard[j+60:j+110, :] = (0,0,0)
-    """
 
 
 clearBoardGuessMade = board.copy()
-cv2.putText(clearBoardGuessMade, "You guessed: ", (i, j), 
+cv2.putText(clearBoardGuessMade, "You guessed: ", (i+30, j), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 player2Color, t, cv2.CV_AA)
 
@@ -361,10 +348,25 @@ cv2.putText(clearBoardUnknownLetter, "Unknown letter, erase and try again", (i, 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 (0,0,255), t, cv2.CV_AA)
 
+clearBoardStabilizing = board.copy()
+cv2.putText(clearBoardStabilizing, "classification stabilizing", (i, j),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                (255,255,255), t, cv2.CV_AA)
+
 obstructedBoard = board.copy()
 cv2.putText(obstructedBoard, "obstructed", (i, j), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 (0,0,255), t, cv2.CV_AA)
+
+playerLose = board.copy()
+cv2.putText(playerLose, "No more guesses. You lose", (i, j-60), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                (255,255,255), t, cv2.CV_AA)
+
+playerWin = board.copy()
+cv2.putText(playerWin, "You guessed the word!", (i, j-60), 
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                (255,255,255), t, cv2.CV_AA)
 
 
 cv2.imshow(winName, clearBoard)
@@ -404,6 +406,8 @@ player1Turn = True
 player1 = ""
 legalMove = True
 gameBoard = {} #Represents tic tac toe board 
+old_guess = ''
+stability_count = 0
 
 while gameplaying:
     ok, frame = capture.read()
@@ -416,7 +420,7 @@ while gameplaying:
     # The actual game board
     roi = dst[col1:col1+squareSize, base:base+squareSize]
 
-    mask = subtractBackground(frame, temporal_avg, threshold=60)
+    mask = subtractBackground(frame, temporal_avg, threshold=80)
     warped_mask = cv2.warpPerspective(mask, M2, (w, h))
     temp_mask_roi = warped_mask[col1:col1+squareSize, base:base+squareSize]
     # with value less than 100 go to 0, and all pixels with value
@@ -435,6 +439,11 @@ while gameplaying:
     kernel = np.ones((4,4),np.uint8)
     denoised_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
     cv2.dilate(mask_roi, kernel, denoised_mask)
+
+    #Mask just to make contour finding easier by connecting any gaps
+    kernel = np.ones((10,10),np.uint8)
+    contour_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
+    cv2.dilate(mask_roi, kernel, contour_mask)
 
     mask_roi = denoised_mask
 
@@ -458,7 +467,7 @@ while gameplaying:
         ######################################################################
         ## Citation: http://stackoverflow.com/questions/9413216/simple-digit-recognition-ocr-in-opencv-python?lq=1
 
-        contours,hierarchy = cv2.findContours(mask_roi.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+        contours,hierarchy = cv2.findContours(contour_mask.copy(),cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
 
         max_area = 0
         [x2, y2, w2, h2] = [0]*4
@@ -483,30 +492,64 @@ while gameplaying:
         features = findattributes.getFeatures(mask_resized)
         ret, result, neighbours, dist = knn.find_nearest(
                         np.array([features], dtype='float32'), k=5)
-        guess = unichr(int(result[0][0]) + ord('A'))
-        #print guess, "dist: ", dist, "features: ", features        
-        display_mask = cv2.cvtColor(mask_resized, cv.CV_GRAY2RGB);
+        guess = result[0][0]
+        for k_val in [7,9]:
+            ret, result, neighbours, dist = knn.find_nearest(
+                        np.array([features], dtype='float32'), k=k_val)
+            if result[0][0] != guess:
+                guess = 'unknown'
+                break
 
+        #print guess, "dist: ", dist, "features: ", features        
+        display_mask = cv2.cvtColor(mask_resized, cv.CV_GRAY2RGB)
 
         #Now display the proper message
-        if np.sum(dist) < -1:
+        if guess == "unknown":
             clearBoardUnknownLetter[board_view_mask] = roi[:,:]
             clearBoardUnknownLetter[threshold_mask] = display_mask[:,:]
             cv2.imshow(winName, clearBoardUnknownLetter)
+            old_guess = guess
         else:
-            clearBoardGuessMade[board_view_mask] = roi[:,:]
-            clearBoardGuessMade[threshold_mask] = display_mask[:,:]
+            guess = unichr(int(guess) + ord('A'))
+            if guess == old_guess:
+                stability_count += 1
+            else:
+                stability_count = 0
+                        
+            old_guess = guess
+            if stability_count < 20:
+                clearBoardStabilizing[board_view_mask] = roi[:,:]
+                clearBoardStabilizing[threshold_mask] = display_mask[:,:]
+                cv2.imshow(winName, clearBoardStabilizing)
+            else:
+                clearBoardGuessMade[board_view_mask] = roi[:,:]
+                clearBoardGuessMade[threshold_mask] = display_mask[:,:]
 
-            guesses[0] = guess
-            #letters.remove(guess)
-            clearText(clearBoardGuessMade)
-           # """
-            cv2.putText(clearBoardGuessMade, "You guessed: "+guess, (i, j), 
-                cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                player2Color, t, cv2.CV_AA)
-           # """
+                if stability_count == 20:
+                    num_guesses += 1
+                    if not guess in guesses:
+                        guesses.append(guess)
+                        letters.remove(guess)
+                    updateGuesses(letters, guesses, clearBoard)
 
-            cv2.imshow(winName, clearBoardGuessMade)
+                    if guessedWord(guesses, word):
+                        updateGuesses(letters, guesses, playerWin)
+                        cv2.imshow(winName, playerWin)
+                        cv2.waitKey(10000)
+                        exit(1)
+
+                    if num_guesses > max_guesses:
+                        updateGuesses(letters, guesses, playerLose)
+                        cv2.imshow(winName, playerLose)
+                        cv2.waitKey(10000)
+                        exit(1)
+
+                    clearText(clearBoardGuessMade)
+                    cv2.putText(clearBoardGuessMade, "You guessed: "+guess, 
+                                (i+30,j), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                                player2Color, t, cv2.CV_AA)
+
+                cv2.imshow(winName, clearBoardGuessMade)
 
     else: #No marks were made, display turn message
 #TODO: should we reset temporal avg if legal move was false
