@@ -200,6 +200,40 @@ def getFeatures(mask):
     return attributes
 
 
+
+
+# Returns hangman word for gameplay
+def getWord():
+
+    # Read in dictionary words from file
+    dictionary = open("words.txt", 'r')
+    dict_list = []
+    for line in dictionary:
+        linenew = line.strip()
+        dict_list += [linenew]
+    # Create dictionary of legal words
+    mydict = set(dict_list)
+
+    # Read in Alice in Wonderland from file
+    alice = open('carroll-alice.txt')
+    alice_list = []
+    for line in alice:
+        linenew = line.strip()
+        linenew = line.split()
+        for word in linenew:
+            word = word.strip(",./?':;()_- !&")
+            word = word.lower()
+        alice_list += [word]
+        
+    # Choose word from Alice in wonderland    
+    word = choice(alice_list)
+    # Pick new word until valid 
+    while (word not in mydict) or (len(word) < 5):
+        word = choice(alice_list)
+    return word
+
+        
+
 def main():
     alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
 
@@ -213,7 +247,10 @@ def main():
             mask = getImMask(filename)
             features = getFeatures(mask)
             f.write(letter + ',' + ','.join(map(str, features)) + "\n")
-            
+
+    word = getWord()
+    print word
+
 if __name__ == '__main__':                    
     main()
     
