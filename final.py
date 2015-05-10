@@ -276,13 +276,14 @@ M2 = np.matrix(M) * homo[0]
 ########################################
 def clearText(img, i=100, j=100):
     # opencv use x,y and numpy uses y,x
-    img[j-30:j+120, 50:] = (0,0,0)
-
+    img[j-50:j+120, 50:] = (0,0,0)
+  
 def updateGuesses(letters, guesses, img, i=100, j=100):
     clearText(img, i, j)
     cv2.putText(clearBoard, "word: "+displayWord(guesses,word), (i, j-20),
                 cv2.FONT_HERSHEY_SIMPLEX, 1.2,
                 player1Color, t, cv2.CV_AA)
+    
     cv2.putText(img, "unused letters: "+' '.join(letters), (i+40, j+20), 
                 cv2.FONT_HERSHEY_SIMPLEX, 0.85,
                 (255,255,255), t, cv2.CV_AA)
@@ -362,12 +363,10 @@ playerLose = board.copy()
 cv2.putText(playerLose, "No more guesses. You lose", (i, j-60), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 (255,255,255), t, cv2.CV_AA)
-
 playerWin = board.copy()
 cv2.putText(playerWin, "You guessed the word!", (i, j-60), 
                 cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                 (255,255,255), t, cv2.CV_AA)
-
 
 cv2.imshow(winName, clearBoard)
 cv2.waitKey(500)
@@ -534,19 +533,26 @@ while gameplaying:
 
                     if guessedWord(guesses, word):
                         updateGuesses(letters, guesses, playerWin)
+                        cv2.putText(playerWin, "word: "+word, (i, j-20),
+                                     cv2.FONT_HERSHEY_SIMPLEX, 1.2,
+                                     player1Color, t, cv2.CV_AA)
                         cv2.imshow(winName, playerWin)
                         cv2.waitKey(10000)
                         exit(1)
 
                     if num_guesses > max_guesses:
                         updateGuesses(letters, guesses, playerLose)
+                        cv2.putText(playerLose, "word: "+word, (i, j-20),
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1.2,
+                                    (0,0,255), t, cv2.CV_AA)
+
                         cv2.imshow(winName, playerLose)
                         cv2.waitKey(10000)
                         exit(1)
 
                     clearText(clearBoardGuessMade)
                     cv2.putText(clearBoardGuessMade, "You guessed: "+guess, 
-                                (i+30,j), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                                (i+40,j), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                                 player2Color, t, cv2.CV_AA)
 
                 cv2.imshow(winName, clearBoardGuessMade)
