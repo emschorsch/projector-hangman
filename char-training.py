@@ -1,3 +1,7 @@
+###
+# Citation: http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_ml/py_knn/py_knn_opencv/py_knn_opencv.html
+####
+
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt

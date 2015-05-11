@@ -51,26 +51,6 @@ def getImMask(filename):
     mask_resized = np.zeros((80,80),'uint8')
     cv2.resize(mask,(80, 80), mask_resized)
 
-    #cv2.imshow('window', mask)
-    #cv2.waitKey(5000)
-    
-    '''
-    if (ymax-ymin) > (xmax-xmin):
-        h_new = 80
-        w_new = (xmax-xmin)*80/(ymax-ymin)
-    else:
-        w_new = 80
-        h_new = (ymax-ymin)*80/(xmax-xmin)
-    '''
-
-
-    #mask_resized = np.zeros((80,80),'uint8')
-    #cv2.resize(mask,(80, 80), mask_resized)
-    
-
-    #cv2.imshow('window', mask_resized)
-    #cv2.waitKey()
-
     return mask_resized
     
 
@@ -241,10 +221,8 @@ def getWord():
 def main():
     alphabet = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
 
-
     f = open('testdata.data', 'w')
-    
-    
+       
     for letter in alphabet:
         filenames = glob.glob("letters/" + letter + '/*')
         for filename in filenames:

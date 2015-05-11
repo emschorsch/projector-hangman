@@ -1,10 +1,10 @@
 ########################################################################
 #
-# File:   lab2.py
+# File:   final.py
 # Author: Emanuel Schorsch and Katie McMenamin
-# Date:   March, 2015
+# Date:   May, 2015
 #
-# Written for ENGR 27 - Computer Vision - Project 2
+# Written for ENGR 27 - Computer Vision - Final Project
 #
 ########################################################################
 #
@@ -12,8 +12,8 @@
 # Project the computer sceen and aim the webcam at the projected image
 # so that the board is appropriately captured
 #
-# After an approx 30 sec setup phase the program will detect illegal moves
-# and allow two human players to play one full game, keeping track of turns
+# After an approx 30 sec setup phase the program will detect written text
+# and allow the player to try and guess a word chosen by the computer
 
 # Usage: the program takes no command arguments. It always tries to capture 
 # from device 0.
@@ -89,65 +89,6 @@ def subtractBackground(frame, background, threshold=120):
     cv2.threshold(dists_uint8, threshold, 255, cv2.THRESH_BINARY, mask) 
     return mask
 
-"""
-player1: The move token player1 is using
-player1Turn: whether it's player1's turn
-move: The move token actually played
-"""
-def checkLegalMark(player1, player1Turn, move):
-    if player1Turn:
-        if player1 == move:
-            return True
-        else:
-            return False
-    else: #Player 2's turn
-        if player1 == 'X' and move == 'O':
-            return True
-        elif player1 == 'O' and move == 'X':
-            return True
-        else:
-            return False
-
-"""
-retrieves the board coordinates based on the projector pixel location
-"""
-def cellLocation(x, y):
-    print "x, y:", x, y
-    # then first column
-    if x < squareSize:
-        if y < squareSize:
-            return (0,0)
-        elif y < 2*squareSize:
-            return (1,0)
-        elif y < 3*squareSize:
-            return (2,0)
-    elif x < 2*squareSize:
-        if y < squareSize:
-            return (0,1)
-        elif y < 2*squareSize:
-            return (1,1)
-        elif y < 3*squareSize:
-            return (2,1)
-    elif x < 3*squareSize:
-        if y < squareSize:
-            return (0,2)
-        elif y < 2*squareSize:
-            return (1,2)
-        elif y < 3*squareSize:
-            return (2,2)
-    return False
-
-"""
-Fills a colored square in image
-different colors depending on the player
-"""
-def colorCells(image, cells, base, col1, player1 = True):
-    color = (255,255,0)
-    if not player1:
-        color = (0,255,0)
-    for cell in cells:
-        cv2.rectangle(image, (base+cell[1]*squareSize, col1+cell[0]*squareSize), (base+(1+cell[1])*squareSize, col1+(1+cell[0])*squareSize), color, -1)
-
 
 winName = "Win"
 cv2.namedWindow(winName, cv2.CV_WINDOW_AUTOSIZE)
@@ -187,26 +128,24 @@ cv2.imshow(winName, board)
 cv2.waitKey(1000)
 
 ################### TRAIN the KNN ############################
+#### citation: http://opencv-python-tutroals.readthedocs.org/en/latest/py_tutorials/py_ml/py_knn/py_knn_opencv/py_knn_opencv.html
 ########################################################
 
 # Load the data, converters convert the letter to a number
 data= np.loadtxt('testdata.data', dtype= 'float32', delimiter = ',',
                     converters= {0: lambda ch: ord(ch)-ord('A')})
 
-# split the data to two, 10000 each for train and test
-train, test = np.vsplit(data,2)
+# train on all the data
 train = data
-test = data
 
-# split trainData and testData to features and responses
+# split trainData to features and responses
 responses, trainData = np.hsplit(train,[1])
-labels, testData = np.hsplit(test,[1])
 
 # Initiate the kNN, classify, measure accuracy.
 knn = cv2.KNearest()
 knn.train(trainData, responses)
 
-############### Setup the homography
+############### Setup the homography  ############
 ###################################################
 
 temp = np.zeros((h, w, 3), dtype = np.uint8)
@@ -312,7 +251,8 @@ def guessedWord(guesses, word):
             return False
     return True
 
-word = findattributes.getWord() #"testing"
+# Gets the word that the player needs to guess
+word = findattributes.getWord()
 print word
 word = word.upper()
 num_guesses = 0
@@ -379,12 +319,6 @@ for i in range(10):
 #Temporal average matrix
 temporal_avg = frame[:]
 
-# Bounds for hysteresis thresholding
-x_ub = .82
-x_lb = .77
-o_ub = .49
-o_lb = .59
-
 # To display the image of the board that the webcam sees
 board_view_mask = (slice(col1, col1+squareSize), 
                     slice(base+4*squareSize,base+5*squareSize))
@@ -400,11 +334,6 @@ col1 += squareSize
 cv2.imshow(winName, clearBoard)
 cv2.waitKey(500)
 
-gameplaying = True
-player1Turn = True
-player1 = ""
-legalMove = True
-gameBoard = {} #Represents tic tac toe board 
 old_guess = ''
 stability_count = 0
 
@@ -416,7 +345,7 @@ while gameplaying:
     # Warp the image to the destination in the temp image.
     dst = cv2.warpPerspective(frame, M2, (w, h))
 
-    # The actual game board
+    # The actual writing box
     roi = dst[col1:col1+squareSize, base:base+squareSize]
 
     mask = subtractBackground(frame, temporal_avg, threshold=80)
@@ -431,10 +360,7 @@ while gameplaying:
     # erode any human made marks to detect obstructions
     cv2.erode(mask_roi, kernel, eroded_mask)
 
-    # erode noise
-    #erode_denoised_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
-    #kernel = np.ones((1,1),np.uint8)
-    #cv2.erode(mask_roi, kernel, erode_denoised_mask)
+    # dilate so the classification will have better matches
     kernel = np.ones((4,4),np.uint8)
     denoised_mask = np.zeros(mask_roi.shape, dtype = np.uint8)
     cv2.dilate(mask_roi, kernel, denoised_mask)
@@ -445,8 +371,6 @@ while gameplaying:
     cv2.dilate(mask_roi, kernel, contour_mask)
 
     mask_roi = denoised_mask
-
-
     display_mask = cv2.cvtColor(mask_roi, cv.CV_GRAY2RGB);
 
     # Board is obstructed so display obstruction message
@@ -457,11 +381,7 @@ while gameplaying:
         cv2.imshow(winName, obstructedBoard)
 
     elif np.sum(mask_roi) > 15000:
-        # If board isn't obstructed, search for templates
-        # To search for templates check all x templates and all o templates.
-        #   record the best result for each. Then using hysterisis thresholding
-        #   check if the mark should be classified as x, o or neither
-
+        # If board isn't obstructed classify the text
         ###################### Now finding Contours ##########################
         ######################################################################
         ## Citation: http://stackoverflow.com/questions/9413216/simple-digit-recognition-ocr-in-opencv-python?lq=1
@@ -475,11 +395,8 @@ while gameplaying:
             if area > max_area:
                 max_area = area
                 [x2,y2,w2,h2] = cv2.boundingRect(cnt)
-
-                #roi = thresh[y:y+h,x:x+w]
-                #roismall = cv2.resize(roi,(10,10))
-                #cv2.imshow('norm',im)
         
+        # Only display the contour with maximum area if its area is > 50
         if max_area > 50:
             cv2.rectangle(display_mask,(x2,y2),(x2+w2,y2+h2),(0,0,255),2)
           
@@ -492,14 +409,14 @@ while gameplaying:
         ret, result, neighbours, dist = knn.find_nearest(
                         np.array([features], dtype='float32'), k=5)
         guess = result[0][0]
+        # Try the kNN classification with k=7,9
         for k_val in [7,9]:
             ret, result, neighbours, dist = knn.find_nearest(
                         np.array([features], dtype='float32'), k=k_val)
-            if result[0][0] != guess:
+            if result[0][0] != guess: #If not unanimous then char is unknown
                 guess = 'unknown'
                 break
 
-        #print guess, "dist: ", dist, "features: ", features        
         display_mask = cv2.cvtColor(mask_resized, cv.CV_GRAY2RGB)
 
         #Now display the proper message
@@ -516,7 +433,7 @@ while gameplaying:
                 stability_count = 0
                         
             old_guess = guess
-            if stability_count < 20:
+            if stability_count < 20: # classification isn't yet stable
                 clearBoardStabilizing[board_view_mask] = roi[:,:]
                 clearBoardStabilizing[threshold_mask] = display_mask[:,:]
                 cv2.imshow(winName, clearBoardStabilizing)
@@ -524,13 +441,15 @@ while gameplaying:
                 clearBoardGuessMade[board_view_mask] = roi[:,:]
                 clearBoardGuessMade[threshold_mask] = display_mask[:,:]
 
-                if stability_count == 20:
+                if stability_count == 20: # Only add the guess the first time
                     num_guesses += 1
+                    # Don't add duplicates
                     if not guess in guesses:
                         guesses.append(guess)
                         letters.remove(guess)
                     updateGuesses(letters, guesses, clearBoard)
 
+                    # Check if player won
                     if guessedWord(guesses, word):
                         updateGuesses(letters, guesses, playerWin)
                         cv2.putText(playerWin, "word: "+word, (i, j-20),
@@ -540,6 +459,7 @@ while gameplaying:
                         cv2.waitKey(10000)
                         exit(1)
 
+                    # Check if player lost
                     if num_guesses > max_guesses:
                         updateGuesses(letters, guesses, playerLose)
                         cv2.putText(playerLose, "word: "+word, (i, j-20),
@@ -557,9 +477,7 @@ while gameplaying:
 
                 cv2.imshow(winName, clearBoardGuessMade)
 
-    else: #No marks were made, display turn message
-#TODO: should we reset temporal avg if legal move was false
-        legalMove = True
+    else: #No marks were made
         clearBoard[board_view_mask] = roi[:,:]
         clearBoard[threshold_mask] = display_mask[:,:]
         cv2.imshow(winName, clearBoard)
